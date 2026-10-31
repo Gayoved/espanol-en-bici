@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Español en Bici</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#16130f; --panel:#231e18; --panel2:#2e2720; --line:#3d342a;
+    --text:#f4ede4; --muted:#b5a896; --accent:#ff7a1a; --accent2:#ffb347;
+    --good:#4cc36b; --bad:#ff5a5a; --sky:#5fb4ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:Rubik,system-ui,sans-serif}
+  body{min-height:100vh;background:
+    radial-gradient(1200px 500px at 50% -200px,#3a2a18 0%,transparent 70%),var(--bg)}
+  button{font-family:inherit;cursor:pointer}
+  .es{direction:ltr;unicode-bidi:isolate;font-weight:600}
+  .wrap{max-width:640px;margin:0 auto;padding:16px 16px 90px}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    position:sticky;top:0;z-index:5;background:rgba(22,19,15,.92);backdrop-filter:blur(6px);
+    padding:10px 16px;border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;font-size:18px;direction:ltr}
+  .logo span{color:var(--accent)}
+  .stats{display:flex;gap:10px;font-weight:600;font-size:15px}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 10px;white-space:nowrap}
+  h1{font-size:26px;margin:8px 0}
+  h2{font-size:20px;margin:6px 0 10px}
+  .muted{color:var(--muted)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin:12px 0}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;
+    padding:14px 20px;font-size:17px;font-weight:600;background:var(--accent);color:#1b1006;
+    box-shadow:0 4px 0 #b24d00;transition:transform .05s}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #b24d00}
+  .btn.full{width:100%}
+  .btn.ghost{background:var(--panel2);color:var(--text);box-shadow:0 4px 0 #120f0b}
+  .btn.small{padding:8px 12px;font-size:15px}
+  .btn:disabled{opacity:.45;cursor:default}
+  .speak{border:0;background:var(--sky);color:#06213a;border-radius:12px;padding:8px 12px;font-size:18px;
+    box-shadow:0 3px 0 #2a6ea8}
+  .speak:active{transform:translateY(2px);box-shadow:0 1px 0 #2a6ea8}
+  input[type=text]{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-size:18px;font-family:inherit}
+
+  /* trail map */
+  .trail{position:relative;margin:10px 0 20px}
+  .node{display:flex;align-items:center;gap:14px;margin:0 0 18px;position:relative}
+  .node:nth-child(even){margin-right:60px}
+  .dot{width:72px;height:72px;flex:0 0 72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:32px;border:4px solid var(--line);background:var(--panel2)}
+  .node.done .dot{border-color:var(--good);background:#1f3a26}
+  .node.open .dot{border-color:var(--accent);background:#3a2410;animation:pulse 1.6s infinite}
+  .node.locked{opacity:.45}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,122,26,.5)}50%{box-shadow:0 0 0 12px rgba(255,122,26,0)}}
+  .node .info b{display:block;font-size:17px}
+  .node .info small{color:var(--muted)}
+  .node button.go{all:unset;cursor:pointer;display:flex;align-items:center;gap:14px;width:100%}
+  .chapter-head{background:linear-gradient(135deg,#ff7a1a33,#5fb4ff22);border:1px solid var(--line);
+    border-radius:18px;padding:16px;margin:12px 0}
+
+  /* lesson */
+  .progress{height:12px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:6px 0 14px}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
+  .big-es{font-size:38px;margin:6px 0;direction:ltr;text-align:center;font-weight:800}
+  .pron{text-align:center;color:var(--accent2);font-size:20px}
+  .mean{text-align:center;font-size:22px;margin-top:8px}
+  .center{text-align:center}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row.between{justify-content:space-between}
+  .opts{display:grid;gap:10px;margin-top:14px}
+  .opt{padding:15px;border-radius:14px;border:2px solid var(--line);background:var(--panel2);color:var(--text);
+    font-size:18px;text-align:center}
+  .opt.sel{border-color:var(--sky)}
+  .opt.right{border-color:var(--good);background:#1f3a26}
+  .opt.wrong{border-color:var(--bad);background:#3e1d1d}
+  .match{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .match .opt.gone{visibility:hidden}
+  .tiles{display:flex;flex-wrap:wrap;gap:8px;direction:ltr;justify-content:center;min-height:56px;padding:10px;
+    border-bottom:2px dashed var(--line);margin:12px 0}
+  .tile{padding:10px 14px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);color:var(--text);
+    font-size:18px;direction:ltr;font-weight:600}
+  .tile.used{visibility:hidden}
+  .feedback{position:fixed;left:0;right:0;bottom:0;padding:16px;z-index:10;transform:translateY(110%);transition:transform .2s}
+  .feedback.show{transform:none}
+  .feedback .inner{max-width:640px;margin:0 auto}
+  .feedback.ok{background:#1c3524;border-top:3px solid var(--good)}
+  .feedback.no{background:#3a1b1b;border-top:3px solid var(--bad)}
+  .feedback h3{margin:0 0 6px}
+  .dlg{display:flex;flex-direction:column;gap:10px}
+  .line{display:flex;gap:10px;align-items:flex-start}
+  .line.me{flex-direction:row-reverse}
+  .avatar{width:42px;height:42px;border-radius:50%;flex:0 0 42px;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--panel2);border:2px solid var(--line)}
+  .bubble{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 12px;flex:1}
+  .line.me .bubble{background:#3a2410;border-color:#6b3d14}
+  .bubble .es{display:block;font-size:18px;text-align:left}
+  .bubble small{color:var(--muted)}
+  .who{font-size:13px;color:var(--accent2);font-weight:600}
+  .tip{background:#1d2b3a;border:1px solid #2c4763;border-radius:14px;padding:12px 14px;margin:12px 0}
+  .mission{background:#2b2312;border:1px dashed var(--accent2);border-radius:14px;padding:14px;margin:12px 0}
+  .trick{font-size:90px;text-align:center;margin:10px 0}
+  .trick.anim{animation:trick 1.4s ease-in-out 2}
+  @keyframes trick{0%{transform:translateY(0) rotate(0)}30%{transform:translateY(-50px) rotate(-25deg)}
+    60%{transform:translateY(-20px) rotate(-360deg)}100%{transform:translateY(0) rotate(-360deg)}}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .navbar{position:fixed;bottom:0;left:0;right:0;background:rgba(22,19,15,.96);border-top:1px solid var(--line);
+    display:flex;justify-content:space-around;padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:4}
+  .navbar button{background:none;border:0;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 10px}
+  .navbar button.on{color:var(--accent)}
+  .navbar button span{font-size:22px}
+  table.pr{width:100%;border-collapse:collapse}
+  table.pr td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+  .x{background:none;border:0;color:var(--muted);font-size:26px}
+  .warn{background:#3a2a10;border:1px solid #7a5520;border-radius:12px;padding:10px;font-size:14px;margin:8px 0}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="logo">Español <span>en Bici</span> 🚵</div>
+  <div class="stats" id="stats"></div>
+</header>
+<main class="wrap" id="app"></main>
+<nav class="navbar" id="nav"></nav>
+<div class="feedback" id="fb"><div class="inner" id="fbInner"></div></div>
+
+<script>
+/* =========================================================
+   CONTENT — Chapter 1: Barcelona. Spanish from Spain (es-ES).
+   word: [spanish, hebrew meaning, hebrew pronunciation]
+   ת' = like English "th" in "think" (Spain's z / ce / ci)
+   ========================================================= */
+const CHARS = {
+  jordi:{name:'ז\'ורדי',emoji:'🧑‍🦱'},
+  marta:{name:'מרתה',emoji:'👩‍🔧'},
+  me:{name:'אתה',emoji:'🚵'}
+};
+
+const CHAPTERS = [
+  {id:'c1',title:'פרק 1: ברצלונה',sub:'פדלים ראשונים בעיר',emoji:'🏙️',lessons:['l1','l2','l3','l4','l5','l6']},
+  {id:'c2',title:'פרק 2: הפירנאים',sub:'בקרוב — מסלולי הרים, מזג אוויר ומחנאות',emoji:'🏔️',lessons:[]},
+  {id:'c3',title:'פרק 3: סיירה נבאדה',sub:'בקרוב — תחרות ה-Enduro הגדולה',emoji:'🏆',lessons:[]}
+];
+
+const LESSONS = {
+  l1:{
+    title:'¡Hola!',he:'שלום ומה נשמע',emoji:'👋',trick:{name:'Bunny hop',emoji:'🐰'},
+    story:'נחתת בברצלונה עם האופניים בתיק. בפארק של מונז\'ואיק רוכב מקומי עושה ווילי ארוך ועוצר לידך. זה ז\'ורדי. הגיע הזמן לפתוח את הפה!',
+    words:[
+      ['hola','שלום','אוֹלָה'],
+      ['buenos días','בוקר טוב','בּוּאֶנוֹס דִיאָס'],
+      ['buenas tardes','צהריים טובים','בּוּאֶנָס טַרְדֶס'],
+      ['buenas noches','לילה טוב / ערב טוב','בּוּאֶנָס נוֹצֶ\'ס'],
+      ['adiós','ביי / להתראות','אַדְיוֹס'],
+      ['hasta luego','נתראה אחר כך','אַסְטָה לוּאֶגוֹ'],
+      ['¿qué tal?','מה נשמע?','קֶה טָאל'],
+      ['bien','טוב','בְּיֶין'],
+      ['muy bien','טוב מאוד','מוּי בְּיֶין'],
+      ['¿y tú?','ואתה?','אִי טוּ'],
+      ['gracias','תודה','גְרָאת\'יָאס'],
+      ['por favor','בבקשה','פּוֹר פָאבּוֹר'],
+      ['¡guay!','מגניב! (סלנג של ספרד)','גוּאַי']
+    ],
+    dialogue:[
+      ['jordi','¡Hola! ¿Qué tal?','שלום! מה נשמע?'],
+      ['me','¡Hola! Bien, gracias. ¿Y tú?','שלום! טוב, תודה. ואתה?'],
+      ['jordi','¡Muy bien! Tu bici es guay.','טוב מאוד! האופניים שלך מגניבים.'],
+      ['me','¡Gracias! Hasta luego.','תודה! נתראה אחר כך.']
+    ],
+    build:[1,3],
+    tip:'בספרדית שמים סימן שאלה או קריאה <b>הפוך גם בתחילת המשפט</b>: <span class="es">¿Qué tal?</span> · <span class="es">¡Hola!</span>. וה-h בספרדית לא נשמעת אף פעם: hola = "אולה".',
+    mission:{he:'מחר בבוקר תגיד לאבא:',es:'¡Buenos días, papá! ¿Qué tal?'}
+  },
+  l2:{
+    title:'Me llamo...',he:'להציג את עצמך',emoji:'🤝',trick:{name:'Manual',emoji:'🛞'},
+    story:'ז\'ורדי רוצה לדעת מי אתה. כאן לומדים להציג את עצמך כמו מקומי.',
+    words:[
+      ['me llamo','קוראים לי','מֶה יָאמוֹ'],
+      ['¿cómo te llamas?','איך קוראים לך?','קוֹמוֹ טֶה יָאמָאס'],
+      ['yo','אני','יוֹ'],
+      ['soy','אני (זה / מ...)','סוֹי'],
+      ['¿de dónde eres?','מאיפה אתה?','דֶה דוֹנְדֶה אֶרֶס'],
+      ['soy de Israel','אני מישראל','סוֹי דֶה אִיסְרָאֶל'],
+      ['¿cuántos años tienes?','בן כמה אתה?','קוּאָנְטוֹס אָנְיוֹס טְיֶינֶס'],
+      ['tengo catorce años','אני בן 14','טֶנְגוֹ קָאטוֹרְת\'ֶה אָנְיוֹס'],
+      ['encantado','נעים מאוד','אֶנְקָנְטָאדוֹ'],
+      ['amigo','חבר','אָמִיגוֹ'],
+      ['también','גם','טָמְבְּיֶין']
+    ],
+    dialogue:[
+      ['jordi','¿Cómo te llamas?','איך קוראים לך?'],
+      ['me','Me llamo {name}. ¿Y tú?','קוראים לי {name}. ואתה?'],
+      ['jordi','Me llamo Jordi. Soy de Barcelona. ¿De dónde eres?','קוראים לי ז\'ורדי. אני מברצלונה. מאיפה אתה?'],
+      ['me','Soy de Israel.','אני מישראל.'],
+      ['jordi','¡Encantado! ¿Cuántos años tienes?','נעים מאוד! בן כמה אתה?'],
+      ['me','Tengo catorce años.','אני בן 14.'],
+      ['jordi','¡Yo también!','גם אני!']
+    ],
+    build:[3,5,6],
+    tip:'<span class="es">ll</span> נשמע כמו י: llamo = "יאמו". ו-<span class="es">ñ</span> נשמעת כמו "ני": años = "אניוס". בן אומר <span class="es">encantado</span>, בת אומרת <span class="es">encantada</span>.',
+    mission:{he:'תציג את עצמך לסבתא או לאחד הדודים — רק בספרדית:',es:'¡Hola! Me llamo … Tengo catorce años.'}
+  },
+  l3:{
+    title:'Los números',he:'מספרים וכסף',emoji:'🔢',trick:{name:'Wheelie',emoji:'🚲'},
+    story:'הקסדה שלך נסדקה בקפיצה האחרונה. ז\'ורדי לוקח אותך לחנות של מרתה, המכונאית הכי טובה בעיר. בלי מספרים — תשלם יותר מדי.',
+    words:[
+      ['cero','0','ת\'ֶרוֹ'],
+      ['uno','1','אוּנוֹ'],
+      ['dos','2','דוֹס'],
+      ['tres','3','טְרֶס'],
+      ['cuatro','4','קוּאָטְרוֹ'],
+      ['cinco','5','ת\'ִינְקוֹ'],
+      ['seis','6','סֶייס'],
+      ['siete','7','סְיֶטֶה'],
+      ['ocho','8','אוֹצ\'וֹ'],
+      ['nueve','9','נוּאֶבֶּה'],
+      ['diez','10','דְיֶית\''],
+      ['veinte','20','בֶּיינְטֶה'],
+      ['¿cuánto cuesta?','כמה זה עולה?','קוּאָנְטוֹ קוּאֶסְטָה'],
+      ['vale','סבבה / בסדר','בָּאלֶה']
+    ],
+    dialogue:[
+      ['marta','¡Hola! Soy Marta, la mecánica.','שלום! אני מרתה, המכונאית.'],
+      ['me','Hola, Marta. ¿Cuánto cuesta el casco?','שלום מרתה. כמה עולה הקסדה?'],
+      ['marta','Cuesta veinte euros.','היא עולה עשרים יורו.'],
+      ['me','Vale, gracias.','סבבה, תודה.']
+    ],
+    build:[2,3],
+    tip:'<span class="es">vale</span> זה ה"סבבה" של ספרד — שומעים את זה כל שתי דקות. וה-<span class="es">v</span> נשמעת כמו <b>b</b>: vale = "באלה".',
+    mission:{he:'תספור בקול מ-0 עד 10 בספרדית מול מישהו מהמשפחה — בלי להציץ:',es:'cero, uno, dos, tres…'}
+  },
+  l4:{
+    title:'La bici',he:'חלקי האופניים',emoji:'🔧',trick:{name:'Drop',emoji:'⛰️'},
+    story:'מרתה בודקת את האופניים שלך. כדי להסביר לה מה לא עובד, תצטרך את השמות של החלקים.',
+    words:[
+      ['la bici','האופניים','לָה בִּית\'י'],
+      ['la rueda','הגלגל','לָה רוּאֶדָה'],
+      ['el freno','הבלם','אֶל פְרֶנוֹ'],
+      ['la cadena','השרשרת','לָה קָאדֶנָה'],
+      ['el pedal','הפדל','אֶל פֶּדָאל'],
+      ['el manillar','הכידון','אֶל מָנִיָאר'],
+      ['el sillín','המושב','אֶל סִיִין'],
+      ['el casco','הקסדה','אֶל קָאסְקוֹ'],
+      ['los guantes','הכפפות','לוֹס גוּאָנְטֶס'],
+      ['mi','שלי','מִי'],
+      ['no funciona','לא עובד','נוֹ פוּנְת\'יוֹנָה'],
+      ['¿qué pasa?','מה קורה? / מה הבעיה?','קֶה פָּאסָה']
+    ],
+    dialogue:[
+      ['marta','¿Qué pasa con tu bici?','מה הבעיה עם האופניים שלך?'],
+      ['me','El freno no funciona.','הבלם לא עובד.'],
+      ['marta','Vale. Y la cadena también.','סבבה. וגם השרשרת.'],
+      ['me','¿Cuánto cuesta?','כמה זה עולה?'],
+      ['marta','Diez euros.','עשרה יורו.'],
+      ['me','¡Vale! Gracias, Marta.','סבבה! תודה, מרתה.']
+    ],
+    build:[1,2],
+    tip:'לכל שם עצם בספרדית יש מין: <span class="es">el</span> (זכר) או <span class="es">la</span> (נקבה). ברבים: <span class="es">los / las</span>. תלמד כל מילה יחד עם ה-el או ה-la שלה.',
+    mission:{he:'תראה לאבא את האופניים ותגיד לו בספרדית שלושה חלקים לפחות:',es:'la rueda, el freno, el sillín…'}
+  },
+  l5:{
+    title:'¡Vamos!',he:'הוראות בשביל',emoji:'🌲',trick:{name:'180',emoji:'🔄'},
+    story:'האופניים מוכנים. ז\'ורדי לוקח אותך לשבילים של קולסרולה, ההרים מעל העיר. הוא צועק הוראות באמצע הירידה — כדאי להבין אותן מהר.',
+    words:[
+      ['¡vamos!','יאללה! / בוא נזוז!','בָּאמוֹס'],
+      ['rápido','מהר','רָאפִּידוֹ'],
+      ['despacio','לאט','דֶסְפָּאת\'יוֹ'],
+      ['arriba','למעלה','אָרִיבָּה'],
+      ['abajo','למטה','אָבָּאחוֹ'],
+      ['a la izquierda','שמאלה','אָה לָה אִית\'קְיֶירְדָה'],
+      ['a la derecha','ימינה','אָה לָה דֶרֶצ\'ה'],
+      ['¡salta!','קפוץ!','סָאלְטָה'],
+      ['¡cuidado!','זהירות!','קוּאִידָאדוֹ'],
+      ['me he caído','נפלתי','מֶה אֶה קָאאִידוֹ'],
+      ['¿estás bien?','אתה בסדר?','אֶסְטָאס בְּיֶין'],
+      ['estoy bien','אני בסדר','אֶסְטוֹי בְּיֶין'],
+      ['¡otra vez!','שוב! / עוד פעם!','אוֹטְרָה בֶּת\'']
+    ],
+    dialogue:[
+      ['jordi','¡Vamos! A la derecha.','יאללה! ימינה.'],
+      ['me','¿Rápido o despacio?','מהר או לאט?'],
+      ['jordi','¡Rápido! ¡Salta!','מהר! קפוץ!'],
+      ['jordi','¡Cuidado!','זהירות!'],
+      ['me','¡Ay! Me he caído.','איי! נפלתי.'],
+      ['jordi','¿Estás bien?','אתה בסדר?'],
+      ['me','Sí, estoy bien. ¡Otra vez!','כן, אני בסדר. עוד פעם!']
+    ],
+    build:[1,6],
+    tip:'<span class="es">j</span> בספרדית נשמעת כמו <b>ח</b> גרונית: abajo = "אבאחו". ו-<span class="es">z</span> נשמעת בספרד כמו th באנגלית: vez = "בֶּת\'".',
+    mission:{he:'בפעם הבאה שאתה רוכב עם מישהו — תצעק בזמן הנכון:',es:'¡Vamos! · ¡Cuidado! · ¡Otra vez!'}
+  },
+  l6:{
+    title:'La familia',he:'המשפחה שלי',emoji:'👨‍👩‍👦',trick:{name:'Tailwhip',emoji:'🌀'},
+    story:'אחרי הרכיבה יושבים לשתות משהו קר. ז\'ורדי שואל על המשפחה שלך. זה השיעור שתשתמש בו הכי הרבה — כי המשפחה שלך מדברת ספרדית!',
+    words:[
+      ['la familia','המשפחה','לָה פָמִילְיָה'],
+      ['mi padre','אבא שלי','מִי פָּאדְרֶה'],
+      ['papá','אבא','פָּאפָּא'],
+      ['mi abuela','סבתא שלי','מִי אָבּוּאֶלָה'],
+      ['mi tío / mi tía','הדוד שלי / הדודה שלי','מִי טִיאוֹ / מִי טִיאָה'],
+      ['mis tíos','הדודים שלי','מִיס טִיאוֹס'],
+      ['mi primo','בן הדוד שלי','מִי פְּרִימוֹ'],
+      ['mi hermano','אח שלי','מִי אֶרְמָאנוֹ'],
+      ['habla español','מדבר ספרדית','אָבְּלָה אֶסְפָּנְיוֹל'],
+      ['¿cómo estás?','מה שלומך?','קוֹמוֹ אֶסְטָאס'],
+      ['te quiero','אני אוהב אותך','טֶה קְיֶירוֹ'],
+      ['os quiero','אני אוהב אתכם','אוֹס קְיֶירוֹ']
+    ],
+    dialogue:[
+      ['jordi','¿Tienes familia en España?','יש לך משפחה בספרד?'],
+      ['me','Sí. Mi abuela y mis tíos.','כן. סבתא שלי והדודים שלי.'],
+      ['jordi','¡Qué guay!','איזה מגניב!'],
+      ['me','Y mi padre habla español.','וגם אבא שלי מדבר ספרדית.'],
+      ['jordi','¡Entonces ya sabes hablar con ellos!','אז אתה כבר יודע לדבר איתם!']
+    ],
+    build:[1,3],
+    tip:'<span class="es">os quiero</span> = אני אוהב <b>אתכם</b>. הצורה <span class="es">os</span> (ו-<span class="es">vosotros</span> = אתם) קיימת בעיקר בספרד — בדיוק מה שתשמע מהמשפחה.',
+    mission:{he:'תתקשר לסבתא (או תגיד לה בפעם הבאה שתראה אותה):',es:'¡Hola, abuela! ¿Cómo estás? Te quiero.'}
+  }
+};
+const ORDER = CHAPTERS.flatMap(c=>c.lessons);
+
+/* =========================================================
+   STATE
+   ========================================================= */
+const KEY='espanol-en-bici-v1';
+const blank = ()=>({name:'',xp:0,streak:0,lastDay:'',done:{},missions:{},errs:{},seen:{}});
+let mem=null;
+function load(){try{const s=localStorage.getItem(KEY);return s?Object.assign(blank(),JSON.parse(s)):blank()}catch(e){return mem||blank()}}
+function save(){mem=S;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let S=load();
+
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
+function dayStr(offset){const d=new Date();d.setDate(d.getDate()+offset);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
+function touchStreak(){
+  const t=today(); if(S.lastDay===t) return;
+  S.streak = (S.lastDay===dayStr(-1)) ? S.streak+1 : 1;
+  S.lastDay=t;
+}
+function liveStreak(){return (S.lastDay===today()||S.lastDay===dayStr(-1))?S.streak:0}
+
+/* =========================================================
+   SPEECH (Spain Spanish voice when available)
+   ========================================================= */
+let voice=null;
+function pickVoice(){
+  if(!('speechSynthesis' in window)) return;
+  const vs=speechSynthesis.getVoices();
+  voice = vs.find(v=>v.lang==='es-ES') || vs.find(v=>/^es[-_]ES/i.test(v.lang)) || vs.find(v=>/^es/i.test(v.lang)) || null;
+}
+if('speechSynthesis' in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
+function say(text,slow){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text.replace(/…/g,'').replace(/\{name\}/g,S.name||''));
+    u.lang='es-ES'; if(voice) u.voice=voice;
+    u.rate = slow?0.55:0.85;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+const speakBtn=(t,slow)=>`<button class="speak" data-say="${esc(t)}" ${slow?'data-slow="1"':''} aria-label="השמע">${slow?'🐢':'🔊'}</button>`;
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+const $=s=>document.querySelector(s);
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const sample=(a,n)=>shuffle(a).slice(0,n);
+const nm=s=>s.replace(/\{name\}/g,S.name||'…');
+const norm=s=>s.toLowerCase().replace(/[¿?¡!.,]/g,'').trim();
+function wordKey(w){return w[0]}
+function learnedWords(){return ORDER.filter(id=>S.done[id]).flatMap(id=>LESSONS[id].words)}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-say]'); if(b){e.stopPropagation();say(b.dataset.say,!!b.dataset.slow)}
+});
+
+function renderStats(){
+  $('#stats').innerHTML=`<span class="pill" title="רצף ימים">🔥 ${liveStreak()}</span><span class="pill" title="נקודות">⭐ ${S.xp}</span>`;
+}
+let tab='map';
+function renderNav(show){
+  const n=$('#nav');
+  if(!show){n.style.display='none';return}
+  n.style.display='flex';
+  const items=[['map','🗺️','מסלול'],['practice','🏋️','תרגול'],['missions','👨‍👩‍👦','משימות'],['tips','🗣️','הגייה'],['me','🏅','אני']];
+  n.innerHTML=items.map(([k,i,l])=>`<button class="${tab===k?'on':''}" data-tab="${k}"><span>${i}</span>${l}</button>`).join('');
+  n.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;home()});
+}
+function hideFb(){$('#fb').className='feedback'}
+
+/* =========================================================
+   ONBOARDING
+   ========================================================= */
+function onboarding(){
+  renderNav(false);renderStats();
+  $('#app').innerHTML=`
+    <div class="card center">
+      <div style="font-size:70px">🚵</div>
+      <h1><span class="es">¡Hola!</span> ברוך הבא</h1>
+      <p class="muted">אתה עומד לרכוב לאורך ספרד — מברצלונה, דרך הפירנאים, ועד סיירה נבאדה. בכל שיעור לומדים ספרדית אמיתית של ספרד ופותחים פעלול חדש.</p>
+      <p>איך קוראים לך?</p>
+      <input type="text" id="nm" placeholder="השם שלך" maxlength="20" autocomplete="off">
+      <div style="height:12px"></div>
+      <button class="btn full" id="start">יאללה, ¡Vamos! 🚀</button>
+    </div>
+    ${!('speechSynthesis' in window)?'<div class="warn">הדפדפן הזה לא תומך בהקראה קולית. כדאי לפתוח ב-Chrome או Safari.</div>':''}`;
+  const go=()=>{const v=$('#nm').value.trim();if(!v){$('#nm').focus();return}S.name=v;save();say('¡Hola, '+v+'!');home()};
+  $('#start').onclick=go; $('#nm').onkeydown=e=>{if(e.key==='Enter')go()};
+}
+
+/* =========================================================
+   HOME TABS
+   ========================================================= */
+function home(){
+  hideFb();
+  if(!S.name) return onboarding();
+  renderStats();renderNav(true);window.scrollTo(0,0);
+  ({map:mapView,practice:practiceView,missions:missionsView,tips:tipsView,me:meView})[tab]();
+}
+
+function mapView(){
+  let html=`<h1><span class="es">¡Hola, ${esc(S.name)}!</span> 👋</h1>`;
+  const nextId=ORDER.find(id=>!S.done[id]);
+  CHAPTERS.forEach(ch=>{
+    html+=`<div class="chapter-head"><div class="row"><span style="font-size:34px">${ch.emoji}</span><div><b style="font-size:19px">${ch.title}</b><br><small class="muted">${ch.sub}</small></div></div></div>`;
+    if(!ch.lessons.length) return;
+    html+='<div class="trail">';
+    ch.lessons.forEach(id=>{
+      const L=LESSONS[id];const done=!!S.done[id];const open=id===nextId;const locked=!done&&!open;
+      html+=`<div class="node ${done?'done':open?'open':'locked'}">
+        <button class="go" data-lesson="${id}" ${locked?'disabled':''}>
+          <div class="dot">${locked?'🔒':done?'✅':L.emoji}</div>
+          <div class="info"><b class="es" style="text-align:right">${L.title}</b><small>${L.he} · פעלול: ${L.trick.name} ${L.trick.emoji}</small></div>
+        </button></div>`;
+    });
+    html+='</div>';
+  });
+  if(!nextId) html+=`<div class="card center"><div style="font-size:50px">🏁</div><b>סיימת את פרק 1!</b><p class="muted">פרקים חדשים בדרך. בינתיים — תרגול ומשימות משפחה.</p></div>`;
+  $('#app').innerHTML=html;
+  document.querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>{if(!b.disabled)startLesson(b.dataset.lesson)});
+}
+
+function missionsView(){
+  const list=ORDER.filter(id=>S.done[id]);
+  let html=`<h1>משימות משפחה 👨‍👩‍👦</h1><p class="muted">הספרדית האמיתית קורית בבית. כל משימה שמבצעים מול אבא, סבתא או הדודים = <b>+15 ⭐</b></p>`;
+  if(!list.length) html+=`<div class="card muted">המשימה הראשונה נפתחת אחרי שיעור 1.</div>`;
+  list.forEach(id=>{
+    const L=LESSONS[id],m=L.mission,d=S.missions[id];
+    html+=`<div class="mission"><div class="row between"><b>${L.emoji} ${esc(L.he)}</b>${d?'<span>✅ בוצע</span>':''}</div>
+      <p>${m.he}</p><div class="row between"><span class="es" style="font-size:19px">${esc(m.es)}</span>${speakBtn(m.es)}</div>
+      ${d?'':`<div style="height:10px"></div><button class="btn small" data-mission="${id}">ביצעתי! +15 ⭐</button>`}</div>`;
+  });
+  $('#app').innerHTML=html;
+  document.querySelectorAll('[data-mission]').forEach(b=>b.onclick=()=>{S.missions[b.dataset.mission]=true;S.xp+=15;touchStreak();save();home()});
+}
+
+function tipsView(){
+  const rows=[
+    ['h','שקטה — לא נשמעת','hola','אולה'],
+    ['ll / y','כמו י','me llamo','מה יאמו'],
+    ['ñ','כמו "ני"','año','אניו'],
+    ['j','ח גרונית','abajo','אבאחו'],
+    ['z · ce · ci','כמו th באנגלית (think) — מסומן ת\' . זה המבטא של ספרד!','gracias','גראת\'יאס'],
+    ['v','נשמעת כמו b','vale','באלה'],
+    ['ch','כמו צ\'','ocho','אוצ\'ו'],
+    ['r / rr','r מתגלגלת קלות, rr (ו-r בתחילת מילה) מתגלגלת חזק','rueda','רואדה'],
+    ['´','הסימן מראה איפה הדגש','rápido','רָאפידו']
+  ];
+  $('#app').innerHTML=`<h1>איך מבטאים 🗣️</h1>
+    <p class="muted">הספרדית נקראת בדיוק כמו שהיא כתובה — אחרי שלומדים את הכללים האלה, אפשר לקרוא כל מילה.</p>
+    <div class="card"><table class="pr">${rows.map(r=>`<tr><td class="es" style="font-size:20px;color:var(--accent2)">${r[0]}</td><td>${r[1]}<br><span class="es">${r[2]}</span> = ${r[3]}</td><td>${speakBtn(r[2])}</td></tr>`).join('')}</table></div>
+    <div class="tip">💡 כל מילה באפליקציה אפשר לשמוע לאט עם 🐢. הכי טוב: לשמוע, להגיד בקול, ואז לבקש מאבא או מסבתא לתקן.</div>
+    ${voice?'':'<div class="warn">לא נמצא במכשיר קול בספרדית של ספרד, אז ההקראה עלולה להישמע במבטא אחר. אפשר להוסיף קול "Spanish (Spain)" בהגדרות הדיבור של המכשיר.</div>'}`;
+}
+
+function meView(){
+  const words=learnedWords().length;
+  const done=ORDER.filter(id=>S.done[id]);
+  $('#app').innerHTML=`<h1>${esc(S.name)} 🏅</h1>
+    <div class="grid2">
+      <div class="card center"><div style="font-size:30px">⭐</div><b style="font-size:24px">${S.xp}</b><div class="muted">נקודות</div></div>
+      <div class="card center"><div style="font-size:30px">🔥</div><b style="font-size:24px">${liveStreak()}</b><div class="muted">ימים ברצף</div></div>
+      <div class="card center"><div style="font-size:30px">📚</div><b style="font-size:24px">${words}</b><div class="muted">מילים וביטויים</div></div>
+      <div class="card center"><div style="font-size:30px">👨‍👩‍👦</div><b style="font-size:24px">${Object.keys(S.missions).length}</b><div class="muted">משימות משפחה</div></div>
+    </div>
+    <h2>הפעלולים שלי</h2>
+    <div class="card">${ORDER.map(id=>{const t=LESSONS[id].trick;return `<span class="pill" style="display:inline-block;margin:4px;${S.done[id]?'':'opacity:.35'}">${S.done[id]?t.emoji:'🔒'} ${t.name}</span>`}).join('')}</div>
+    <div class="warn">ההתקדמות נשמרת רק בדפדפן הזה. במכשיר אחר מתחילים מחדש.</div>
+    <button class="btn ghost small" id="reset">איפוס והתחלה מחדש</button>
+    <div id="rc"></div>`;
+  $('#reset').onclick=()=>{$('#rc').innerHTML=`<div class="card">בטוח? כל ההתקדמות תימחק.<div style="height:8px"></div><button class="btn small" id="yes">כן, לאפס</button></div>`;
+    $('#yes').onclick=()=>{S=blank();save();tab='map';home()}};
+}
+
+/* =========================================================
+   LESSON FLOW
+   ========================================================= */
+let R=null; // running session
+
+function lessonShell(inner,progress){
+  renderNav(false);
+  return `<div class="row between"><button class="x" id="quit" aria-label="יציאה">✕</button>
+    <div style="flex:1" class="progress"><i style="width:${Math.round((progress||0)*100)}%"></i></div></div>${inner}`;
+}
+function bindQuit(){const q=$('#quit');if(q)q.onclick=()=>{speechSynthesis&&speechSynthesis.cancel();R=null;home()}}
+
+function startLesson(id){
+  const L=LESSONS[id];
+  R={id,L,step:'story',wi:0};
+  storyStep();
+}
+function storyStep(){
+  const {L}=R;
+  $('#app').innerHTML=lessonShell(`
+    <div class="card"><div class="center" style="font-size:54px">${L.emoji}</div>
+      <h1 class="center es">${L.title}</h1><p class="center muted">${L.he}</p>
+      <p style="font-size:18px;line-height:1.6">${L.story}</p></div>
+    <div class="tip">💡 ${L.tip}</div>
+    <button class="btn full" id="next">למילים החדשות ←</button>`,0.02);
+  bindQuit();$('#next').onclick=()=>{R.wi=0;wordStep()};
+}
+function wordStep(){
+  const {L}=R;const w=L.words[R.wi];const n=L.words.length;
+  $('#app').innerHTML=lessonShell(`
+    <p class="muted center">מילה ${R.wi+1} מתוך ${n}</p>
+    <div class="card">
+      <div class="big-es">${esc(w[0])}</div>
+      <div class="pron">${esc(w[2])}</div>
+      <div class="row" style="justify-content:center;margin-top:12px">${speakBtn(w[0])}${speakBtn(w[0],true)}</div>
+      <div class="mean">${esc(w[1])}</div>
+    </div>
+    <p class="center muted">🎤 תגיד את זה בקול פעם אחת לפני שממשיכים</p>
+    <div class="row"><button class="btn ghost" id="prev" ${R.wi?'':'disabled'}>→</button><button class="btn" style="flex:1" id="next">${R.wi<n-1?'הבא ←':'לשיחה ←'}</button></div>`,
+    0.05+0.25*(R.wi/n));
+  bindQuit();say(w[0]);
+  $('#prev').onclick=()=>{if(R.wi){R.wi--;wordStep()}};
+  $('#next').onclick=()=>{if(R.wi<n-1){R.wi++;wordStep()}else dialogueStep()};
+}
+function dialogueHTML(L){
+  return `<div class="dlg">${L.dialogue.map(([who,es,he])=>{
+    const me=who==='me';const c=CHARS[who];
+    return `<div class="line ${me?'me':''}"><div class="avatar">${c.emoji}</div>
+      <div class="bubble"><div class="row between"><span class="who">${me?esc(S.name):c.name}</span>${speakBtn(nm(es))}</div>
+      <span class="es">${esc(nm(es))}</span><small>${esc(nm(he))}</small></div></div>`}).join('')}</div>`;
+}
+function dialogueStep(){
+  const {L}=R;
+  $('#app').innerHTML=lessonShell(`
+    <h2>💬 השיחה</h2><p class="muted">תקשיב לכל שורה. את השורות שלך (בכתום) תגיד בקול.</p>
+    <div class="card">${dialogueHTML(L)}</div>
+    <button class="btn ghost full" id="all">▶️ השמע את כל השיחה</button><div style="height:10px"></div>
+    <button class="btn full" id="next">לאימון ←</button>`,0.32);
+  bindQuit();
+  $('#all').onclick=()=>playAll(L.dialogue.map(d=>nm(d[1])));
+  $('#next').onclick=()=>{speechSynthesis&&speechSynthesis.cancel();startPractice(buildLessonQueue(R.L),'lesson')};
+}
+function playAll(lines){
+  if(!('speechSynthesis' in window))return;
+  speechSynthesis.cancel();
+  lines.forEach(t=>{const u=new SpeechSynthesisUtterance(t);u.lang='es-ES';if(voice)u.voice=voice;u.rate=0.85;speechSynthesis.speak(u)});
+}
+
+/* ---------- exercise generation ---------- */
+function pool(L){const own=L.words;const extra=learnedWords().filter(w=>!own.includes(w));return own.concat(extra)}
+function mcEsHe(w,P){return {t:'mc',prompt:'מה הפירוש?',show:w[0],sayIt:w[0],answer:w[1],opts:shuffle([w[1],...sample(P.filter(x=>x[1]!==w[1]),3).map(x=>x[1])]),word:w}}
+function mcHeEs(w,P){return {t:'mc',prompt:'איך אומרים בספרדית?',showHe:w[1],answer:w[0],esOpts:true,opts:shuffle([w[0],...sample(P.filter(x=>x[0]!==w[0]),3).map(x=>x[0])]),word:w}}
+function listen(w,P){return {t:'mc',prompt:'מה שמעת?',listen:w[0],answer:w[0],esOpts:true,opts:shuffle([w[0],...sample(P.filter(x=>x[0]!==w[0]),3).map(x=>x[0])]),word:w}}
+function matchEx(ws){return {t:'match',pairs:ws.slice(0,5)}}
+function buildEx(line,P){
+  const toks=line[1].split(' ');
+  const extras=sample(P.map(w=>w[0]).filter(s=>!s.includes(' ')&&!toks.map(norm).includes(norm(s))),2);
+  return {t:'build',he:line[2],answer:line[1],tiles:shuffle(toks.concat(extras))};
+}
+function buildLessonQueue(L){
+  const P=pool(L);const W=L.words;
+  const q=[];
+  W.forEach(w=>q.push(mcEsHe(w,P)));
+  sample(W,Math.min(5,W.length)).forEach(w=>q.push(mcHeEs(w,P)));
+  sample(W,4).forEach(w=>q.push(listen(w,P)));
+  q.push(matchEx(sample(W,5)));
+  const mixed=shuffle(q);
+  L.build.forEach(i=>mixed.push(buildEx(L.dialogue[i],P)));
+  return mixed;
+}
+function buildReviewQueue(){
+  const W=learnedWords();
+  const weighted=W.flatMap(w=>Array(1+Math.min(4,S.errs[wordKey(w)]||0)).fill(w));
+  const picks=[];const used=new Set();
+  for(const w of shuffle(weighted)){if(!used.has(w[0])){used.add(w[0]);picks.push(w)}if(picks.length>=10)break}
+  const q=picks.map((w,i)=>[mcEsHe,mcHeEs,listen][i%3](w,W));
+  q.push(matchEx(sample(W,5)));
+  return shuffle(q);
+}
+
+/* ---------- practice runner ---------- */
+function startPractice(queue,mode){
+  R=Object.assign(R||{},{q:queue,i:0,total:queue.length,mode,correct:0,firstTry:0,retry:new Set()});
+  nextEx();
+}
+function nextEx(){
+  hideFb();
+  if(R.i>=R.q.length) return finish();
+  const ex=R.q[R.i];
+  const prog=R.mode==='lesson'?0.35+0.6*(R.i/R.q.length):R.i/R.q.length;
+  ({mc:renderMC,match:renderMatch,build:renderBuild})[ex.t](ex,prog);
+}
+function result(ok,ex,correctText){
+  const fb=$('#fb');
+  const isRetry=R.retry.has(ex);
+  if(ok){R.correct++;if(!isRetry){R.firstTry++;S.xp+=R.mode==='lesson'?10:5}}
+  else{
+    if(ex.word){S.errs[wordKey(ex.word)]=(S.errs[wordKey(ex.word)]||0)+1}
+    if(!isRetry){R.retry.add(ex);R.q.push(ex)}
+  }
+  save();renderStats();
+  const praise=['¡Muy bien!','¡Genial!','¡Perfecto!','¡Qué guay!','¡Eso es!'];
+  fb.className='feedback show '+(ok?'ok':'no');
+  $('#fbInner').innerHTML=`<h3>${ok?'✅ <span class="es">'+praise[Math.floor(Math.random()*praise.length)]+'</span>':'❌ לא נורא — זה יחזור בסוף'}</h3>
+    ${ok?'':`<p>התשובה הנכונה: <b class="${/[a-záéíóúñ¿¡]/i.test(correctText)?'es':''}">${esc(correctText)}</b></p>`}
+    <button class="btn full" id="cont">המשך ←</button>`;
+  if(ok&&ex.word) say(ex.word[0]);
+  $('#cont').onclick=()=>{R.i++;nextEx()};
+}
+
+function renderMC(ex,prog){
+  let head='';
+  if(ex.show) head=`<div class="big-es">${esc(ex.show)}</div><div class="center">${speakBtn(ex.show)}</div>`;
+  else if(ex.showHe) head=`<div class="mean" style="font-size:28px;font-weight:700">${esc(ex.showHe)}</div>`;
+  else if(ex.listen) head=`<div class="center" style="margin:10px 0">${speakBtn(ex.listen).replace('class="speak"','class="speak" style="font-size:40px;padding:18px 26px"')} ${speakBtn(ex.listen,true)}</div>`;
+  $('#app').innerHTML=lessonShell(`<h2>${ex.prompt}</h2><div class="card">${head}</div>
+    <div class="opts">${ex.opts.map((o,i)=>`<button class="opt ${ex.esOpts?'es':''}" data-i="${i}">${esc(o)}</button>`).join('')}</div>`,prog);
+  bindQuit();
+  if(ex.listen||ex.show) setTimeout(()=>say(ex.listen||ex.show),250);
+  document.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    const pick=ex.opts[+b.dataset.i];const ok=pick===ex.answer;
+    document.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(ex.opts[+x.dataset.i]===ex.answer)x.classList.add('right')});
+    if(!ok)b.classList.add('wrong');
+    result(ok,ex,ex.answer);
+  });
+}
+
+function renderMatch(ex,prog){
+  const L=shuffle(ex.pairs.map((p,i)=>({i,txt:p[0],es:true}))),Rt=shuffle(ex.pairs.map((p,i)=>({i,txt:p[1]})));
+  $('#app').innerHTML=lessonShell(`<h2>התאם זוגות</h2><p class="muted">לחץ על מילה בספרדית ואז על הפירוש שלה</p>
+    <div class="match"><div class="opts" style="margin:0">${L.map(x=>`<button class="opt es" data-s="L" data-i="${x.i}">${esc(x.txt)}</button>`).join('')}</div>
+    <div class="opts" style="margin:0">${Rt.map(x=>`<button class="opt" data-s="R" data-i="${x.i}">${esc(x.txt)}</button>`).join('')}</div></div>`,prog);
+  bindQuit();
+  let sel=null,left=ex.pairs.length,mistakes=0;
+  document.querySelectorAll('.match .opt').forEach(b=>b.onclick=()=>{
+    if(b.classList.contains('gone'))return;
+    if(b.dataset.s==='L') say(ex.pairs[+b.dataset.i][0]);
+    if(!sel||sel.dataset.s===b.dataset.s){if(sel)sel.classList.remove('sel');sel=b;b.classList.add('sel');return}
+    if(sel.dataset.i===b.dataset.i){
+      [sel,b].forEach(x=>{x.classList.remove('sel');x.classList.add('right');setTimeout(()=>x.classList.add('gone'),250)});
+      sel=null;left--;
+      if(!left) setTimeout(()=>{if(!mistakes)S.xp+=R.mode==='lesson'?10:5;R.correct++;save();renderStats();R.i++;nextEx()},350);
+    }else{
+      mistakes++;const a=sel,c=b;[a,c].forEach(x=>x.classList.add('wrong'));
+      const w=ex.pairs[+(a.dataset.s==='L'?a:c).dataset.i];S.errs[wordKey(w)]=(S.errs[wordKey(w)]||0)+1;save();
+      setTimeout(()=>[a,c].forEach(x=>x.classList.remove('wrong','sel')),500);sel=null;
+    }
+  });
+}
+
+function renderBuild(ex,prog){
+  let chosen=[];
+  const draw=()=>{
+    $('#app').innerHTML=lessonShell(`<h2>בנה את המשפט בספרדית</h2>
+      <div class="card"><div class="mean" style="margin:0">${esc(nm(ex.he))}</div></div>
+      <div class="tiles" id="ans">${chosen.map((ti,k)=>`<button class="tile" data-k="${k}">${esc(ex.tiles[ti])}</button>`).join('')}</div>
+      <div class="tiles" style="border:0">${ex.tiles.map((t,ti)=>`<button class="tile ${chosen.includes(ti)?'used':''}" data-t="${ti}">${esc(t)}</button>`).join('')}</div>
+      <button class="btn full" id="check" ${chosen.length?'':'disabled'}>בדוק</button>`,prog);
+    bindQuit();
+    document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{const ti=+b.dataset.t;if(!chosen.includes(ti)){chosen.push(ti);say(ex.tiles[ti]);draw()}});
+    document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{chosen.splice(+b.dataset.k,1);draw()});
+    $('#check').onclick=()=>{
+      const got=norm(chosen.map(ti=>ex.tiles[ti]).join(' '));const ok=got===norm(ex.answer);
+      document.querySelectorAll('.tile').forEach(t=>t.disabled=true);
+      result(ok,ex,ex.answer);if(ok)say(ex.answer);
+    };
+  };
+  draw();
+}
+
+function finish(){
+  hideFb();touchStreak();
+  if(R.mode==='review'){
+    S.xp+=10;save();renderStats();
+    $('#app').innerHTML=`<div class="card center"><div style="font-size:60px">💪</div><h1 class="es">¡Buen trabajo!</h1>
+      <p>${R.firstTry} מתוך ${R.total} נכון בניסיון הראשון · +10 ⭐ בונוס</p></div>
+      <button class="btn full" id="again">עוד סבב</button><div style="height:10px"></div><button class="btn ghost full" id="back">חזרה</button>`;
+    $('#again').onclick=()=>startPractice(buildReviewQueue(),'review');
+    $('#back').onclick=()=>{R=null;home()};
+    return;
+  }
+  const {id,L}=R;const first=!S.done[id];
+  S.done[id]=true;if(first)S.xp+=20;save();renderStats();
+  $('#app').innerHTML=`
+    <div class="card center">
+      <h1 class="es">¡Lección completada!</h1>
+      <p class="muted">${R.firstTry} מתוך ${R.total} נכון בניסיון הראשון${first?' · +20 ⭐ בונוס':''}</p>
+      <div class="trick anim">${L.trick.emoji}</div>
+      <h2>פעלול חדש נפתח: <span class="es">${L.trick.name}</span></h2>
+    </div>
+    <div class="mission"><b>🎯 משימת משפחה</b><p>${L.mission.he}</p>
+      <div class="row between"><span class="es" style="font-size:19px">${esc(L.mission.es)}</span>${speakBtn(L.mission.es)}</div>
+      <p class="muted" style="margin-bottom:0">אחרי שביצעת — סמן בלשונית "משימות" ותקבל +15 ⭐</p></div>
+    <button class="btn full" id="back">חזרה למסלול 🗺️</button>`;
+  say('¡Muy bien, '+S.name+'!');
+  $('#back').onclick=()=>{R=null;tab='map';home()};
+}
+
+function practiceView(){
+  const W=learnedWords();
+  if(!W.length){$('#app').innerHTML=`<h1>תרגול 🏋️</h1><div class="card muted">אחרי השיעור הראשון יופיע כאן תרגול חוזר. המילים שטעית בהן יחזרו יותר.</div>`;return}
+  const hard=W.filter(w=>(S.errs[wordKey(w)]||0)>0).sort((a,b)=>S.errs[wordKey(b)]-S.errs[wordKey(a)]).slice(0,6);
+  $('#app').innerHTML=`<h1>תרגול 🏋️</h1>
+    <p class="muted">סבב קצר של 11 תרגילים מכל מה שלמדת. המילים שקשות לך מופיעות יותר.</p>
+    <button class="btn full" id="go">התחל סבב תרגול</button>
+    ${hard.length?`<h2 style="margin-top:20px">המילים שהכי קשות לך</h2><div class="card">${hard.map(w=>`<div class="row between" style="padding:6px 0;border-bottom:1px solid var(--line)"><span><b class="es">${esc(w[0])}</b> — ${esc(w[1])}</span>${speakBtn(w[0])}</div>`).join('')}</div>`:''}
+    <h2 style="margin-top:20px">כל המילים (${W.length})</h2>
+    <div class="card">${W.map(w=>`<div class="row between" style="padding:6px 0;border-bottom:1px solid var(--line)"><span><b class="es">${esc(w[0])}</b> — ${esc(w[1])}</span>${speakBtn(w[0])}</div>`).join('')}</div>`;
+  $('#go').onclick=()=>{R={};startPractice(buildReviewQueue(),'review')};
+}
+
+home();
+</script>
+</body>
+</html>
