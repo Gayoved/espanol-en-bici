@@ -389,7 +389,7 @@ function renderNav(show){
   n.innerHTML=items.map(([k,i,l])=>`<button class="${tab===k?'on':''}" data-tab="${k}"><span>${i}</span>${l}</button>`).join('');
   n.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;home()});
 }
-function hideFb(){$('#fb').className='feedback'}
+function hideFb(){$('#fb').className='feedback';try{stopRec();if(curRecog)curRecog.abort()}catch(e){}}
 
 /* =========================================================
    ONBOARDING
@@ -533,9 +533,11 @@ function wordStep(){
       <div class="mean">${esc(w[1])}</div>
     </div>
     <p class="center muted">🎤 תגיד את זה בקול פעם אחת לפני שממשיכים</p>
+    ${canRec?'<div class="card" style="padding:12px"><div id="wrec"></div></div>':''}
     <div class="row"><button class="btn ghost" id="prev" ${R.wi?'':'disabled'}>→</button><button class="btn" style="flex:1" id="next">${R.wi<n-1?'הבא ←':'לשיחה ←'}</button></div>`,
     0.05+0.25*(R.wi/n));
   bindQuit();say(w[0]);
+  if(canRec) mountRecorder($('#wrec'),w[0]);
   $('#prev').onclick=()=>{if(R.wi){R.wi--;wordStep()}};
   $('#next').onclick=()=>{if(R.wi<n-1){R.wi++;wordStep()}else dialogueStep()};
 }
@@ -581,8 +583,11 @@ function buildLessonQueue(L){
   sample(W,Math.min(5,W.length)).forEach(w=>q.push(mcHeEs(w,P)));
   sample(W,4).forEach(w=>q.push(listen(w,P)));
   q.push(matchEx(sample(W,5)));
+  const sw=sayable(W);if(sw.length)q.push(sayWordEx(sample(sw,1)[0]));
   const mixed=shuffle(q);
   L.build.forEach(i=>mixed.push(buildEx(L.dialogue[i],P)));
+  const myLines=L.dialogue.filter(d=>d[0]==='me'&&!d[1].includes('{name}'));
+  if(myLines.length){const d=sample(myLines,1)[0];mixed.push({t:'say',target:d[1],he:d[2]})}
   return mixed;
 }
 function buildReviewQueue(){
@@ -592,7 +597,152 @@ function buildReviewQueue(){
   for(const w of shuffle(weighted)){if(!used.has(w[0])){used.add(w[0]);picks.push(w)}if(picks.length>=10)break}
   const q=picks.map((w,i)=>[mcEsHe,mcHeEs,listen][i%3](w,W));
   q.push(matchEx(sample(W,5)));
+  sample(sayable(picks),2).forEach(w=>q.push(sayWordEx(w)));
   return shuffle(q);
+}
+
+
+/* =========================================================
+   SPEAKING: speech recognition (when the browser has it)
+   + record & compare (fallback, and on every word card)
+   ========================================================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+const canRec = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+let srBroken=false; // set when the recognizer fails for service reasons -> use recorder
+let curRecog=null;
+
+function sayable(W){return W.filter(w=>!/[\/…]/.test(w[0]))}
+function sayWordEx(w){return {t:'say',target:w[0],he:w[1],word:w}}
+
+const NUMW={0:'cero',1:'uno',2:'dos',3:'tres',4:'cuatro',5:'cinco',6:'seis',7:'siete',8:'ocho',9:'nueve',10:'diez',14:'catorce',20:'veinte'};
+function normSp(s){
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/\d+/g,d=>NUMW[+d]||d).replace(/[¿?¡!.,…:;"']/g,' ').replace(/\s+/g,' ').trim();
+}
+function lev(a,b){
+  const m=a.length,n=b.length;if(!m)return n;if(!n)return m;
+  let prev=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){const cur=[i];for(let j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));prev=cur}
+  return prev[n];
+}
+function sim(heard,target){
+  const h=normSp(heard),t=normSp(target);if(!h)return 0;
+  if(h===t||(' '+h+' ').includes(' '+t+' '))return 1;
+  return 1-lev(h,t)/Math.max(h.length,t.length);
+}
+function listenOnce(){
+  return new Promise((res,rej)=>{
+    const r=new SR();curRecog=r;r.lang='es-ES';r.interimResults=false;r.maxAlternatives=5;r.continuous=false;
+    let settled=false;
+    r.onresult=e=>{settled=true;res(Array.from(e.results[0]).map(a=>a.transcript))};
+    r.onerror=e=>{if(settled)return;settled=true;rej(e.error||'error')};
+    r.onend=()=>{curRecog=null;if(!settled){settled=true;res([])}};
+    try{r.start()}catch(err){settled=true;rej('start')}
+  });
+}
+
+/* recorder */
+let mediaRec=null;
+async function startRec(){
+  const st=await navigator.mediaDevices.getUserMedia({audio:true});
+  const mr=new MediaRecorder(st);const ch=[];
+  mr.ondataavailable=e=>{if(e.data&&e.data.size)ch.push(e.data)};
+  const done=new Promise(r=>mr.onstop=()=>{st.getTracks().forEach(t=>t.stop());mediaRec=null;r(URL.createObjectURL(new Blob(ch,{type:mr.mimeType||'audio/webm'})))});
+  mr.start();
+  mediaRec={mr,timer:setTimeout(()=>{if(mr.state==='recording')mr.stop()},7000)};
+  return done;
+}
+function stopRec(){if(mediaRec&&mediaRec.mr.state==='recording'){clearTimeout(mediaRec.timer);mediaRec.mr.stop()}}
+function playThen(url,after){
+  try{speechSynthesis.cancel()}catch(e){}
+  const a=new Audio(url);a.onended=()=>after&&after();a.play().catch(()=>{});
+}
+/* onSelf(ok:boolean) -> self-assessment buttons are shown only when given */
+function mountRecorder(el,target,onSelf){
+  let url=null,recording=false,msg='';
+  const draw=()=>{
+    el.innerHTML=`<div class="row" style="justify-content:center">
+        <button class="btn ${recording?'':'ghost'} small" data-r="rec">${recording?'⏹ עצור':(url?'⏺ הקלט שוב':'🎙️ הקלט את עצמך')}</button>
+        ${url&&!recording?'<button class="btn ghost small" data-r="me">▶️ אני</button><button class="btn ghost small" data-r="cmp">🔁 אני ← הדוגמה</button>':''}
+      </div>
+      ${url&&!recording&&onSelf?'<p class="center" style="margin:12px 0 6px">נשמע דומה לדוגמה?</p><div class="row" style="justify-content:center"><button class="btn small" data-r="ok">✅ כן, דומה</button><button class="btn ghost small" data-r="again">🔄 עוד פעם</button></div>':''}
+      <div class="muted center" style="margin-top:8px;font-size:14px">${recording?'🔴 מקליט… תגיד את זה עכשיו':msg}</div>`;
+    el.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>act(b.dataset.r));
+  };
+  const act=k=>{
+    if(k==='rec'){
+      if(recording){stopRec();return}
+      recording=true;msg='';draw();
+      startRec().then(u=>{url=u;recording=false;msg='עכשיו תקשיב: 🔁 משמיע אותך ומיד אחר כך את הדוגמה';draw();playThen(u,()=>say(target))})
+        .catch(()=>{recording=false;msg='אין גישה למיקרופון. צריך לאשר אותה בדפדפן (סמל המנעול ליד הכתובת).';draw()});
+    }
+    if(k==='me')playThen(url);
+    if(k==='cmp')playThen(url,()=>say(target));
+    if(k==='again'){url=null;msg='';draw()}
+    if(k==='ok')onSelf(true);
+  };
+  draw();
+}
+
+function renderSay(ex,prog){
+  let tries=0;
+  const mode=()=>(SR&&!srBroken)?'sr':(canRec?'rec':'self');
+  const firstNote=mode()==='sr'&&!S.micNote;
+  $('#app').innerHTML=lessonShell(`<h2>תגיד את זה בקול 🎤</h2>
+    <div class="card"><div class="big-es" style="font-size:30px">${esc(ex.target)}</div>
+      <div class="mean" style="font-size:18px">${esc(ex.he)}</div>
+      <div class="row" style="justify-content:center;margin-top:10px">${speakBtn(ex.target)}${speakBtn(ex.target,true)}</div></div>
+    ${firstNote?'<div class="tip" style="font-size:14px">🎤 בפעם הראשונה הדפדפן יבקש אישור למיקרופון. הזיהוי נעשה על ידי שירות הדיבור של הדפדפן (Google ב-Chrome, Apple ב-Safari). האפליקציה לא שומרת את ההקלטה.</div>':''}
+    <div id="sayArea"></div>
+    <p class="center"><button class="x" style="font-size:15px;text-decoration:underline" id="skip">אני לא יכול לדבר עכשיו — דלג</button></p>`,prog);
+  bindQuit();
+  if(firstNote){S.micNote=true;save()}
+  $('#skip').onclick=()=>{R.i++;nextEx()};
+  const area=$('#sayArea');
+
+  const giveUp=()=>{
+    if(ex.word){S.errs[wordKey(ex.word)]=(S.errs[wordKey(ex.word)]||0)+1;save()}
+    const fb=$('#fb');fb.className='feedback show no';
+    $('#fbInner').innerHTML=`<h3>🤝 לא נורא, ממשיכים</h3><p>את המשפט הזה כדאי לתרגל מול אבא או סבתא. הם ישמעו מה צריך לתקן.</p><button class="btn full" id="cont">המשך ←</button>`;
+    $('#cont').onclick=()=>{R.i++;nextEx()};
+  };
+
+  const drawSR=(status)=>{
+    area.innerHTML=`<div class="center"><button class="btn" id="mic" style="font-size:22px;padding:18px 28px">🎤 לחץ ודבר</button>
+      <p id="st" class="muted" style="min-height:24px">${status||'לחץ, חכה רגע, ותגיד את המשפט'}</p>
+      ${tries>=3?'<button class="btn ghost small" id="giveup">ממשיכים הלאה</button>':''}</div>`;
+    $('#mic').onclick=go;
+    const g=$('#giveup');if(g)g.onclick=giveUp;
+  };
+  const go=()=>{
+    try{speechSynthesis.cancel()}catch(e){}
+    const st=$('#st'),mic=$('#mic');mic.disabled=true;st.textContent='🔴 מקשיב… דבר עכשיו';
+    listenOnce().then(alts=>{
+      if(!alts.length){drawSR('לא שמעתי כלום. נסה שוב, קצת יותר קרוב למיקרופון.');return}
+      const best=Math.max(...alts.map(a=>sim(a,ex.target)));
+      if(best>=0.72){
+        result(true,ex,ex.target,`<p>שמעתי: <b class="es">${esc(alts[0])}</b></p>`);
+      }else{
+        tries++;
+        drawSR(`שמעתי: <b class="es">${esc(alts[0])}</b> — לא בדיוק. תקשיב לדוגמה ונסה שוב (${tries}/3)`);
+      }
+    }).catch(err=>{
+      if(err==='not-allowed'){drawSR('אין גישה למיקרופון. צריך לאשר אותה בדפדפן (סמל המנעול ליד הכתובת).');return}
+      if(err==='no-speech'||err==='aborted'){drawSR('לא שמעתי כלום. נסה שוב.');return}
+      srBroken=true; // network / service-not-allowed / language-not-supported → recorder
+      draw();
+    });
+  };
+  const drawRec=()=>{
+    area.innerHTML='<div class="card"><p class="center" style="margin-top:0">הקלט את עצמך, תקשיב, ותשווה לדוגמה</p><div id="rw"></div></div>';
+    mountRecorder($('#rw'),ex.target,()=>result(true,ex,ex.target));
+  };
+  const drawSelf=()=>{
+    area.innerHTML='<div class="center"><p class="muted">תגיד את זה בקול, ואז לחץ</p><button class="btn" id="said">✅ אמרתי</button></div>';
+    $('#said').onclick=()=>result(true,ex,ex.target);
+  };
+  const draw=()=>({sr:()=>drawSR(),rec:drawRec,self:drawSelf})[mode()]();
+  draw();
 }
 
 /* ---------- practice runner ---------- */
@@ -605,9 +755,9 @@ function nextEx(){
   if(R.i>=R.q.length) return finish();
   const ex=R.q[R.i];
   const prog=R.mode==='lesson'?0.35+0.6*(R.i/R.q.length):R.i/R.q.length;
-  ({mc:renderMC,match:renderMatch,build:renderBuild})[ex.t](ex,prog);
+  ({mc:renderMC,match:renderMatch,build:renderBuild,say:renderSay})[ex.t](ex,prog);
 }
-function result(ok,ex,correctText){
+function result(ok,ex,correctText,extra){
   const fb=$('#fb');
   const isRetry=R.retry.has(ex);
   if(ok){R.correct++;if(!isRetry){R.firstTry++;S.xp+=R.mode==='lesson'?10:5}}
@@ -620,8 +770,9 @@ function result(ok,ex,correctText){
   fb.className='feedback show '+(ok?'ok':'no');
   $('#fbInner').innerHTML=`<h3>${ok?'✅ <span class="es">'+praise[Math.floor(Math.random()*praise.length)]+'</span>':'❌ לא נורא — זה יחזור בסוף'}</h3>
     ${ok?'':`<p>התשובה הנכונה: <b class="${/[a-záéíóúñ¿¡]/i.test(correctText)?'es':''}">${esc(correctText)}</b></p>`}
+    ${extra||''}
     <button class="btn full" id="cont">המשך ←</button>`;
-  if(ok&&ex.word) say(ex.word[0]);
+  if(ok&&ex.word&&ex.t!=='say') say(ex.word[0]);
   $('#cont').onclick=()=>{R.i++;nextEx()};
 }
 
